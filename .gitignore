@@ -1,0 +1,9 @@
+# Local planning and agent working files
+.claude-work/
+.claude/
+
+# Editor and OS noise
+.vscode/
+*.swp
+Thumbs.db
+.DS_Store

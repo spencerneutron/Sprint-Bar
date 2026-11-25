@@ -1,0 +1,16 @@
+## Interface: 16001, 120105, 120107
+## Title: Sprint Bar
+## Notes: A stamina bar for the run/walk toggle. Sprinting drains stamina; when it runs out you are asked to walk.
+## Author: boolbog
+## Version: 0.1.0
+## Category: Interface Enhancements
+## IconTexture: Interface\Icons\Ability_Rogue_Sprint
+## SavedVariables: SprintBarDB
+## SavedVariablesPerCharacter: SprintBarCharDB
+## AddonCompartmentFunc: SprintBar_OnAddonCompartmentClick
+
+Core.lua
+Stamina.lua
+Movement.lua
+Bar.lua
+Options.lua
