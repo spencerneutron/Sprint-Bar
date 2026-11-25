@@ -2,7 +2,7 @@
 ## Title: Sprint Bar
 ## Notes: A stamina bar for the run/walk toggle. Sprinting drains stamina; when it runs out you are asked to walk.
 ## Author: boolbog
-## Version: 0.1.0
+## Version: 0.2.0
 ## Category: Interface Enhancements
 ## IconTexture: Interface\Icons\Ability_Rogue_Sprint
 ## SavedVariables: SprintBarDB

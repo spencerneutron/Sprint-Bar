@@ -33,8 +33,7 @@ ns.Defaults = {
     exemptGhost = false,
 
     overlayEnabled = true,
-    overlayMaxAlpha = 0.85,
-    overlayRampSeconds = 4,
+    -- overlayMaxAlpha and overlayRampSeconds live in ns.Presets (Stamina.lua)
     soundEnabled = true,
 
     lastBlocked = nil, -- { func = string, time = number }
@@ -261,11 +260,12 @@ local function OnLogin()
 
     ns.StartLoop()
 
+    local ruleset = ns.PresetLabels[ns.GetPresetName()] or "Custom"
     local keyText = ns.GetSprintKeyText()
     if keyText then
-        ns.Print("Sprint key: " .. keyText .. " (toggles run/walk). Run/Walk state is unknown until you move. /sprintbar for options.")
+        ns.Print("Ruleset: " .. ruleset .. ". Sprint key: " .. keyText .. " (toggles run/walk). Run/Walk state is unknown until you move. /sprintbar for options.")
     else
-        ns.Print("No sprint key set. Type /sprintbar key to choose one. Run/Walk state is unknown until you move.")
+        ns.Print("Ruleset: " .. ruleset .. ". No sprint key set. Type /sprintbar key to choose one. Run/Walk state is unknown until you move.")
     end
 end
 

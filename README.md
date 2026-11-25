@@ -50,6 +50,7 @@ The folder name must be `Sprint-Bar` so it matches `Sprint-Bar.toc`.
 | `debug` | Toggle debug output |
 | `hook on` / `hook off` | Use the `ToggleRun` hook to track mode (`off` needs `/reload` to remove fully) |
 | `walkspeed <n>` | Speed (yd/s) at or below which you count as walking, default 3.0 |
+| `preset [standard\|hardcore]` | Show or switch the ruleset |
 | `status` | Print a diagnostic block (including how run/walk was classified and the raw speeds) to paste into a bug report |
 | `help` | List commands |
 
@@ -57,7 +58,30 @@ The folder name must be `Sprint-Bar` so it matches `Sprint-Bar.toc`.
 
 Enabled, lock bar, show text, fade when full, bar scale, sprint seconds at level 1 and level 60, regeneration seconds and delay, recover threshold, mounted regeneration and drain multipliers, exhaustion overlay and its opacity, sound, exempt while ghost, debug. Changes apply immediately. The "Set sprint key" button is in the same category.
 
+## Rulesets
+
+Two presets set the numbers for you. Standard is the default.
+
+| | Standard | Hardcore |
+| --- | --- | --- |
+| Sprint time, full bar, level 1 | 8 s | 2 s |
+| Sprint time, full bar, level 60 | 30 s | 6 s |
+| Time to refill an empty bar | 20 s | 120 s |
+| Wait before regeneration starts | 1.5 s | 5 s |
+| Sprint locked until stamina reaches | 25 | 50 |
+| Deepest debt | -30 | -50 |
+| Ground mount regeneration | 1.5x faster | 1.25x faster |
+| Mounted drain | 1.0x | 1.0x |
+| Overlay builds up over | 4 s | 2 s |
+| Overlay strongest opacity | 85% | 95% |
+
+Hardcore is meant for short bursts of run speed that you must budget, such as a dodge.
+
+Switch with the "Ruleset" dropdown at the top of the options, or `/sprintbar preset standard` or `/sprintbar preset hardcore`. `/sprintbar preset` alone shows the active ruleset. Switching keeps your current stamina. Changing any ruleset slider (sprint seconds, regeneration, recover threshold, mounted multipliers, overlay opacity) shows the ruleset as "Custom". The overlay build-up time and the debt limit have no slider; only the presets change them. Other settings (bar look, key, sound, overlay on/off, ghost exemption) are never changed by a preset.
+
 ## How stamina works
+
+The numbers below are the Standard ruleset.
 
 - Scale 0 to 100, can go down to -30 (debt).
 - A full bar lasts 8 seconds of sprinting at level 1 and 30 seconds at level 60, scaling in between.

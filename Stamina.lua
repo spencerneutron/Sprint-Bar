@@ -7,21 +7,61 @@ ns = ns or {}
 local Stamina = {}
 ns.Stamina = Stamina
 
--- Settings owned by the model. Core merges these into the saved variables.
-ns.StaminaDefaults = {
-    maxLevel = 60,
-    sprintSecondsLevel1 = 8,
-    sprintSecondsMaxLevel = 30,
-    regenSeconds = 20,
-    regenDelay = 1.5,
-    recoverThreshold = 25,
-    mountedRegenMult = 1.5,
-    mountedDrainMult = 1.0,
-    debtMax = 30,
+-- Ruleset presets: the only place their numbers are written down. Data only.
+ns.Presets = {
+    standard = {
+        sprintSecondsLevel1 = 8,
+        sprintSecondsMaxLevel = 30,
+        regenSeconds = 20,
+        regenDelay = 1.5,
+        recoverThreshold = 25,
+        debtMax = 30,
+        mountedRegenMult = 1.5,
+        mountedDrainMult = 1.0,
+        overlayRampSeconds = 4,
+        overlayMaxAlpha = 0.85,
+    },
+    hardcore = {
+        sprintSecondsLevel1 = 2,
+        sprintSecondsMaxLevel = 6,
+        regenSeconds = 120,
+        regenDelay = 5,
+        recoverThreshold = 50,
+        debtMax = 50,
+        mountedRegenMult = 1.25,
+        mountedDrainMult = 1.0,
+        overlayRampSeconds = 2,
+        overlayMaxAlpha = 0.95,
+    },
 }
+ns.PresetOrder = { "standard", "hardcore" }
+ns.PresetLabels = { standard = "Standard", hardcore = "Hardcore", custom = "Custom" }
+
+-- Settings owned by the model. Core merges these into the saved variables.
+-- Ruleset keys come from the Standard preset; maxLevel is not part of a preset.
+ns.StaminaDefaults = { maxLevel = 60 }
+for k, v in pairs(ns.Presets.standard) do ns.StaminaDefaults[k] = v end
 
 local D = ns.StaminaDefaults
-local DEFAULT_RAMP = 4 -- matches Defaults.overlayRampSeconds in Core.lua
+local DEFAULT_RAMP = D.overlayRampSeconds
+
+-- Name of the first preset whose every value matches ns.db, else "custom". Derived, never stored.
+function ns.GetPresetName()
+    local db = ns.db
+    if type(db) ~= "table" then return "custom" end
+    for _, name in ipairs(ns.PresetOrder) do
+        local match = true
+        for k, v in pairs(ns.Presets[name]) do
+            local cur = db[k]
+            if type(cur) ~= "number" or math.abs(cur - v) > 1e-6 then
+                match = false
+                break
+            end
+        end
+        if match then return name end
+    end
+    return "custom"
+end
 
 local function opt(s, key)
     local v = s and s[key]

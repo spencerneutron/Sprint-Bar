@@ -269,7 +269,7 @@ end
 
 local function Pct(v) return string.format("%d%%", math.floor(v * 100 + 0.5)) end
 local function Secs(v) return string.format("%.1fs", v) end
-local function Mult(v) return string.format("x%.1f", v) end
+local function Mult(v) return string.format("x%.2f", v) end
 local function Scale(v) return string.format("%.2f", v) end
 
 local ITEMS = {
@@ -278,12 +278,12 @@ local ITEMS = {
     { "check", "showText", "Show text", "Show the stamina percentage and state on the bar." },
     { "check", "fadeWhenFull", "Fade when full", "Fade the bar out while stamina is full and you are not sprinting." },
     { "slider", "scale", "Bar scale", "Size of the bar.", 0.5, 2, 0.05, Scale },
-    { "slider", "sprintSecondsLevel1", "Sprint seconds at level 1", "How long a full bar lasts while sprinting at level 1.", 2, 60, 1, Secs },
+    { "slider", "sprintSecondsLevel1", "Sprint seconds at level 1", "How long a full bar lasts while sprinting at level 1.", 1, 60, 1, Secs },
     { "slider", "sprintSecondsMaxLevel", "Sprint seconds at level 60", "How long a full bar lasts while sprinting at level 60 and above.", 5, 180, 1, Secs },
-    { "slider", "regenSeconds", "Regeneration seconds", "Seconds to refill an empty bar.", 5, 120, 1, Secs },
+    { "slider", "regenSeconds", "Regeneration seconds", "Seconds to refill an empty bar.", 5, 300, 1, Secs },
     { "slider", "regenDelay", "Regeneration delay", "Seconds after sprinting before stamina regenerates.", 0, 10, 0.5, Secs },
     { "slider", "recoverThreshold", "Recover threshold", "Stamina needed after exhaustion before you may sprint again.", 5, 100, 5, function(v) return string.format("%d", v) end },
-    { "slider", "mountedRegenMult", "Mounted regeneration multiplier", "Regeneration speed while on a ground mount.", 1, 3, 0.1, Mult },
+    { "slider", "mountedRegenMult", "Mounted regeneration multiplier", "Regeneration speed while on a ground mount.", 1, 3, 0.05, Mult },
     { "slider", "mountedDrainMult", "Mounted drain multiplier", "Drain speed while mounted.", 0, 2, 0.1, Mult },
     { "check", "overlayEnabled", "Exhaustion overlay", "Darken the screen while you sprint with no stamina." },
     { "slider", "overlayMaxAlpha", "Overlay max opacity", "Opacity of the darkening at its strongest.", 0.1, 1, 0.05, Pct },
@@ -298,8 +298,34 @@ local function DefaultFor(key)
     return v
 end
 
+local settingObjs = {} -- key -> registered Settings object, so presets can refresh open sliders
+local rulesetSetting   -- proxy behind the Ruleset dropdown
+local applying = false -- true while ApplyPreset is running
+
 local function OnChanged()
     if ns.Bar and ns.Bar.ApplySettings then ns.Bar.ApplySettings() end
+    -- Refresh the Ruleset dropdown so it shows Custom (or a preset) after a slider change.
+    if not applying and rulesetSetting then pcall(rulesetSetting.NotifyUpdate, rulesetSetting) end
+end
+
+-- Copy a preset into ns.db and make the rest of the addon see it immediately.
+function ns.ApplyPreset(name)
+    local preset = type(name) == "string" and ns.Presets[name]
+    local db = ns.db
+    if not preset or not db then return false end
+    applying = true
+    for k, v in pairs(preset) do db[k] = v end
+    if ns.state and type(ns.state.stamina) == "number" and ns.state.stamina < -db.debtMax then
+        ns.state.stamina = -db.debtMax
+    end
+    if ns.Bar and ns.Bar.ApplySettings then pcall(ns.Bar.ApplySettings) end
+    for k, v in pairs(preset) do
+        local setting = settingObjs[k]
+        if setting then pcall(setting.SetValue, setting, v) end
+    end
+    applying = false
+    if rulesetSetting then pcall(rulesetSetting.NotifyUpdate, rulesetSetting) end
+    return true
 end
 
 local function AddItem(category, item)
@@ -308,6 +334,7 @@ local function AddItem(category, item)
         or (kind == "check" and "boolean" or "number")
     local setting = Settings.RegisterAddOnSetting(category, "SPRINTBAR_" .. key, key, ns.db, varType, label, DefaultFor(key))
     setting:SetValueChangedCallback(OnChanged)
+    settingObjs[key] = setting
     if kind == "check" then
         Settings.CreateCheckbox(category, setting, tooltip)
     else
@@ -318,6 +345,33 @@ local function AddItem(category, item)
         end
         Settings.CreateSlider(category, setting, opts, tooltip)
     end
+end
+
+local function PresetSummary(name)
+    local p = ns.Presets[name]
+    return string.format("%s: %g-%g s of sprint, %g s to refill, sprint locked until %g%% after exhaustion.",
+        ns.PresetLabels[name], p.sprintSecondsLevel1, p.sprintSecondsMaxLevel, p.regenSeconds, p.recoverThreshold)
+end
+
+local function AddRulesetDropdown(category)
+    local varType = Settings.VarType and Settings.VarType.String or "string"
+    local function GetValue() return ns.GetPresetName() end
+    local function SetValue(value)
+        if value == "standard" or value == "hardcore" then ns.ApplyPreset(value) end
+    end
+    local function GetOptions()
+        local container = Settings.CreateControlTextContainer()
+        for _, name in ipairs(ns.PresetOrder) do
+            container:Add(name, ns.PresetLabels[name])
+        end
+        container:Add("custom", ns.PresetLabels.custom)
+        return container:GetData()
+    end
+    local tooltip = PresetSummary("standard") .. " " .. PresetSummary("hardcore")
+        .. " Changing any ruleset slider switches this to Custom."
+    rulesetSetting = Settings.RegisterProxySetting(category, "SPRINTBAR_ruleset", varType, "Ruleset",
+        "standard", GetValue, SetValue)
+    Settings.CreateDropdown(category, rulesetSetting, GetOptions, tooltip)
 end
 
 local registered = false
@@ -331,6 +385,9 @@ function Options.Register()
     local ok, err = pcall(function()
         local category, layout = Settings.RegisterVerticalLayoutCategory("Sprint Bar")
         Options.category = category
+
+        local rsOk, rsErr = pcall(AddRulesetDropdown, category)
+        if not rsOk then ns.Debug("ruleset dropdown failed: " .. tostring(rsErr)) end
 
         if type(CreateSettingsButtonInitializer) == "function" and layout and type(layout.AddInitializer) == "function" then
             pcall(function()
@@ -387,6 +444,7 @@ function Options.PrintStatus()
     local level = ns.level
     local lines = {
         "status: Sprint Bar " .. ns.version .. ", client " .. build,
+        "ruleset: " .. (ns.PresetLabels[ns.GetPresetName()] or "Custom"),
         string.format("level %s, sprintSeconds %.1f, drain %.2f/s, regen %.2f/s (mounted regen x%.1f, drain x%.1f)",
             tostring(level), S.SprintSeconds(level, db), S.DrainRate(level, db), S.RegenRate(db),
             db.mountedRegenMult, db.mountedDrainMult),
@@ -432,8 +490,16 @@ local HELP = {
     "/sprintbar hook on|off - run/walk toggle hook (hook off needs /reload)",
     "/sprintbar walkspeed <number> - speed at or below this counts as walking",
     "/sprintbar debug - toggle debug output",
+    "/sprintbar preset [standard|hardcore] - show or switch the ruleset",
     "/sprintbar status - diagnostic block",
 }
+
+local function PrintPresets()
+    local names = {}
+    for _, name in ipairs(ns.PresetOrder) do names[#names + 1] = name end
+    ns.Print("Ruleset: " .. (ns.PresetLabels[ns.GetPresetName()] or "Custom")
+        .. ". Available: " .. table.concat(names, ", ") .. ". Use /sprintbar preset <name>.")
+end
 
 local function Slash(msg)
     local db = ns.db
@@ -494,6 +560,17 @@ local function Slash(msg)
             ns.Print("Walk speed ceiling set to " .. n .. ".")
         else
             ns.Print("Usage: /sprintbar walkspeed <number between 0.5 and 7>. Current: " .. tostring(db.walkSpeedCeiling))
+        end
+    elseif cmd == "preset" then
+        local arg = rest:lower()
+        if arg == "" then
+            PrintPresets()
+        elseif ns.ApplyPreset(arg) then
+            local level = ns.level
+            ns.Print(string.format("Ruleset set to %s: %.1f s of sprint at your level, %g s to refill.",
+                ns.PresetLabels[arg], ns.Stamina.SprintSeconds(level, db), db.regenSeconds))
+        else
+            PrintPresets()
         end
     elseif cmd == "status" then
         Options.PrintStatus()
