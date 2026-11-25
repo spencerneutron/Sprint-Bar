@@ -1,0 +1,98 @@
+name: Package Sprint Bar
+
+# Push a tag like v0.3.0 (or v0.3.0-beta1) to build the addon zip, stamp the
+# tag's version into the TOC, and publish a GitHub release with the zip.
+# "Run workflow" on the Actions tab builds the same zip from any branch
+# without publishing a release. Either way the zip is a workflow artifact.
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+
+    env:
+      ADDON: Sprint-Bar
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v7
+
+      - name: Resolve version
+        id: version
+        run: |
+          set -euo pipefail
+          if [[ "$GITHUB_REF_TYPE" == "tag" ]]; then
+            version="${GITHUB_REF_NAME#v}"
+          else
+            version="$(sed -n 's/^## Version:[[:space:]]*//p' "$ADDON.toc" | tr -d '\r')"
+          fi
+          if [[ ! "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.]+)?$ ]]; then
+            echo "::error::'$version' is not a version like 1.2.3 or 1.2.3-beta1"
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "zip=$ADDON-$version.zip" >> "$GITHUB_OUTPUT"
+
+      - name: Stage addon folder
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          set -euo pipefail
+          stage="build/$ADDON"
+          mkdir -p "$stage"
+          cp "$ADDON.toc" README.md ./*.lua "$stage/"
+          if [[ -f LICENSE ]]; then cp LICENSE "$stage/"; fi
+
+          sed -i -E "s/^## Version:.*/## Version: $VERSION/" "$stage/$ADDON.toc"
+
+          # Every file the TOC loads must be in the package.
+          missing=0
+          while IFS= read -r line || [[ -n "$line" ]]; do
+            line="${line%$'\r'}"
+            if [[ -z "$line" || "$line" == \#* ]]; then continue; fi
+            if [[ ! -f "$stage/${line//\\//}" ]]; then
+              echo "::error::$ADDON.toc lists '$line', which is not in the package"
+              missing=1
+            fi
+          done < "$stage/$ADDON.toc"
+          if [[ "$missing" -ne 0 ]]; then exit 1; fi
+
+      - name: Build zip
+        env:
+          ZIP: ${{ steps.version.outputs.zip }}
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          cd build
+          zip -r -X "../dist/$ZIP" "$ADDON"
+          unzip -l "../dist/$ZIP"
+
+      - name: Upload zip as workflow artifact
+        uses: actions/upload-artifact@v7
+        with:
+          path: dist/${{ steps.version.outputs.zip }}
+          archive: false
+          if-no-files-found: error
+
+      - name: Publish GitHub release
+        if: github.ref_type == 'tag'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.version.outputs.version }}
+          ZIP: ${{ steps.version.outputs.zip }}
+        run: |
+          set -euo pipefail
+          flags=()
+          if [[ "$VERSION" == *-* ]]; then flags+=(--prerelease); fi
+          gh release create "$GITHUB_REF_NAME" "dist/$ZIP" \
+            --title "$GITHUB_REF_NAME" \
+            --generate-notes \
+            "${flags[@]}"

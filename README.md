@@ -103,3 +103,12 @@ The numbers below are the Standard ruleset.
 10. Log out at low stamina, log back in later: stamina is restored plus time-based regeneration.
 11. Check chat for a "Blizzard blocked an action" warning. If one appears, run `/sprintbar hook off`, `/reload` and send `/sprintbar status`.
 12. Level up (or test with different levels): the sprint seconds in `status` change.
+
+## Releasing
+
+`.github/workflows/release.yaml` builds `Sprint-Bar-<version>.zip`, which unpacks to a single `Sprint-Bar/` folder ready for `Interface/AddOns` or an addon host.
+
+- **Release:** push a tag such as `v0.3.0`. The workflow writes that version into the packaged TOC, attaches the zip to the run as an artifact and publishes a GitHub release with it. A tag with a suffix (`v0.3.0-beta1`) is published as a pre-release.
+- **Test build:** use "Run workflow" on the Actions tab. It builds the zip from the chosen branch with the TOC's own version and publishes no release.
+
+The build fails if the tag is not a `v1.2.3` style version or if the TOC lists a file that is not in the package.
