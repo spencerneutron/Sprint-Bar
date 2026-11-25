@@ -71,9 +71,17 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p dist
-          cd build
-          zip -r -X "../dist/$ZIP" "$ADDON"
-          unzip -l "../dist/$ZIP"
+          python3 - "$ADDON" "dist/$ZIP" <<'PY'
+          import pathlib, sys, zipfile
+          addon, out = sys.argv[1], sys.argv[2]
+          root = pathlib.Path("build")
+          with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED, compresslevel=9) as z:
+              for path in sorted((root / addon).rglob("*")):
+                  if path.is_file():
+                      z.write(path, path.relative_to(root).as_posix())
+          PY
+          unzip -l "dist/$ZIP"
+          test -s "dist/$ZIP"
 
       - name: Upload zip as workflow artifact
         uses: actions/upload-artifact@v7
