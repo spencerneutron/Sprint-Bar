@@ -1,6 +1,7 @@
 # Local planning and agent working files
 .claude-work/
 .claude/
+.synapse.toml
 
 # Editor and OS noise
 .vscode/
